@@ -8,6 +8,7 @@ import uvicorn
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat
 
@@ -16,6 +17,8 @@ from app.config import load_config
 from app.database import Database
 from app.handlers import admin, channel, user
 from app.web import create_web_app
+
+logger = logging.getLogger(__name__)
 
 
 async def set_commands(bot: Bot, admin_ids: frozenset[int]) -> None:
@@ -30,10 +33,18 @@ async def set_commands(bot: Bot, admin_ids: frozenset[int]) -> None:
         BotCommand(command="syncchannel", description="Синхронизировать доступ"),
     ]
     for admin_id in admin_ids:
-        await bot.set_my_commands(
-            admin_commands,
-            scope=BotCommandScopeChat(chat_id=admin_id),
-        )
+        try:
+            await bot.set_my_commands(
+                admin_commands,
+                scope=BotCommandScopeChat(chat_id=admin_id),
+            )
+        except TelegramAPIError as exc:
+            logger.warning(
+                "Не удалось установить команды для админа %s: %s. "
+                "Проверьте ADMIN_IDS и убедитесь, что админ нажал /start в боте.",
+                admin_id,
+                exc,
+            )
 
 
 async def main() -> None:
